@@ -36,6 +36,8 @@ class TrelloHelper
 
   EPIC_REF_REGEX = /\[.*\]\(https?:\/\/trello\.com\/.+\) \([^\)]+\)/
 
+  SPRINT_CARD_LIST = "In Progress"
+
   ACCEPTED_STATES = {
     'Accepted' => 1,
     'Done' => 2
@@ -48,7 +50,7 @@ class TrelloHelper
 
   IN_PROGRESS_STATES = {
     'Design' => 1,
-    'In Progress' => 2,
+    SPRINT_CARD_LIST => 2, # "In Progress"
     'Pending Upstream' => 3,
     'Pending Merge' => 4
   }
@@ -96,7 +98,7 @@ class TrelloHelper
     'Done' => 10,
     'Accepted' => 50,
     'Complete' => 100,
-    'In Progress' => 200,
+    SPRINT_CARD_LIST => 200, # "In Progress"
     'Design' => 250,
     'Next' => 300,
     'Stalled' => 350,
@@ -140,6 +142,7 @@ class TrelloHelper
     @sortable_card_labels = {}
     @dependent_work_board = {}
     @next_dependent_work_list = {}
+    @sprint_cards_by_board = {}
   end
 
   def board_ids
@@ -385,16 +388,30 @@ class TrelloHelper
     @boards
   end
 
+  def managed_sprint_boards
+    return @managed_sprint_boards if @managed_sprint_boards
+    @managed_sprint_boards = {}
+    managed_teams = teams.select{ |t,v| v[:manage_sprint_card] }
+    managed_teams.each do |team, team_map|
+      @managed_sprint_boards[team] = team_boards(team)
+    end
+    @managed_sprint_boards
+  end
+
+  def board_sprint_card(board)
+    @sprint_cards_by_board[board] if @sprint_cards_by_board[board]
+    in_progress_list = list_cards(board_lists(board).find { |list| list.name == SPRINT_CARD_LIST })
+    if in_progress_list
+      sprint_card = in_progress_list.sort_by { |card| card.pos }.first
+      @sprint_cards_by_board[board] = sprint_card
+    end
+    @sprint_cards_by_board[board]
+  end
+
   def sprint_card
     return @sprint_card if @sprint_card
     board = board(board_ids.last)
-    board_lists(board).each do |list|
-      if IN_PROGRESS_STATES.include?(list.name)
-        @sprint_card = list_cards(list).sort_by { |card| card.pos }.first
-        return @sprint_card
-      end
-    end
-    nil
+    board_sprint_card(board)
   end
 
   def dependent_work_board(board_id=dependent_work_board_id)
