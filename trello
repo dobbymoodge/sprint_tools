@@ -842,6 +842,35 @@ command :convert_markers_to_labels do |c|
   end
 end
 
+command :delete_dups do |c|
+  c.syntax = "#{name} update"
+
+  c.option "--file FILE.json", "The json file with checklist items to delete"
+
+  c.action do |args, options|
+    dups = JSON.load(IO.read(options.file))
+    to_delete = dups["to_delete"]
+    id_checklist = nil
+    checklist = nil
+    to_delete.each do |card_url, items_by_id|
+      puts "\n  *** Deleting dupe items from board at URL #{card_url}\n\n"
+      items_by_id.each do |id, item|
+        if item['idChecklist'] != id_checklist
+          id_checklist = item['idChecklist']
+          checklist = Trello::Checklist.find id_checklist
+          puts "  Checklist ID: #{id_checklist}"
+        end
+        if !checklist.items.any?{|i| i.id == id}
+          puts "No checklist item matching #{id}"
+        else
+          puts "Deleting item id #{id} named #{item['name']}"
+          checklist.delete_checklist_item id
+        end
+      end
+    end
+  end
+end
+
 command :update do |c|
   c.syntax = "#{name} update"
 
